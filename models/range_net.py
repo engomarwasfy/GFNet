@@ -128,12 +128,9 @@ class ResNet(nn.Module):
                 BatchNorm(planes * block.expansion),
             )
 
-        layers = []
-        layers.append(block(self.inplanes, planes, stride, downsample))
+        layers = [block(self.inplanes, planes, stride, downsample)]
         self.inplanes = planes * block.expansion
-        for i in range(1, blocks):
-            layers.append(block(self.inplanes, planes))
-
+        layers.extend(block(self.inplanes, planes) for _ in range(1, blocks))
         return nn.Sequential(*layers)
 
     def forward(self, x):
@@ -162,7 +159,7 @@ def resnet18(pretrained=False, **kwargs):
     if pretrained:
         # model.load_state_dict(model_zoo.load_url(model_urls['resnet18']))
         model_path = 'pretrained/resnet18-5c106cde.pth'
-        mp_logger('loading model from: {}'.format(model_path))
+        mp_logger(f'loading model from: {model_path}')
         model.load_state_dict(torch.load(model_path), strict=False)
     return model
 
@@ -177,7 +174,7 @@ def resnet34(pretrained=False, **kwargs):
     if pretrained:
         # model.load_state_dict(model_zoo.load_url(model_urls['resnet34']))
         model_path = 'pretrained/resnet34-333f7ec4.pth'
-        mp_logger('loading model from: {}'.format(model_path))
+        mp_logger(f'loading model from: {model_path}')
         model.load_state_dict(torch.load(model_path), strict=False)
     return model
 
@@ -192,7 +189,7 @@ def resnet50(pretrained=False, **kwargs):
     if pretrained:
         # model.load_state_dict(model_zoo.load_url(model_urls['resnet50']))
         model_path = 'pretrained/resnet50-19c8e357.pth'
-        mp_logger('loading model from: {}'.format(model_path))
+        mp_logger(f'loading model from: {model_path}')
         model.load_state_dict(torch.load(model_path), strict=False)
     return model
 

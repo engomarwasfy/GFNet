@@ -122,7 +122,7 @@ def main():
     gpus = [int(i) for i in FLAGS.gpus.split(',')]
 
     port = find_free_port()
-    FLAGS.dist_url = 'tcp://localhost:{}'.format(port)
+    FLAGS.dist_url = f'tcp://localhost:{port}'
 
     try:
         mp.set_start_method('spawn')

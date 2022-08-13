@@ -35,7 +35,7 @@ class SemanticKitti(Dataset):
                  min_volume_space=[3, -np.pi, -3],
                  ignore_label=0,
                  gt=True,
-                 knn=True):          # send ground truth?
+                 knn=True):      # send ground truth?
         # save deats
         self.root = os.path.join(root, "sequences")
         self.sequences = sequences
@@ -58,7 +58,7 @@ class SemanticKitti(Dataset):
 
         # make sure directory exists
         if os.path.isdir(self.root):
-            mp_logger("Sequences folder exists! Using sequences from %s" % self.root)
+            mp_logger(f"Sequences folder exists! Using sequences from {self.root}")
         else:
             raise ValueError("Sequences folder doesn't exist! Exiting...")
 
@@ -75,7 +75,7 @@ class SemanticKitti(Dataset):
             # to string
             seq = '{0:02d}'.format(int(seq))
 
-            mp_logger("parsing seq {}".format(seq))
+            mp_logger(f"parsing seq {seq}")
 
             # get paths for each
             scan_path = os.path.join(self.root, seq, "velodyne")
@@ -106,8 +106,9 @@ class SemanticKitti(Dataset):
         self.label_files.sort()
         self.knn_files.sort()
 
-        mp_logger("Using {} scans from sequences {}".format(len(self.scan_files),
-                                                        self.sequences))
+        mp_logger(
+            f"Using {len(self.scan_files)} scans from sequences {self.sequences}"
+        )
     def __len__(self):
         return len(self.scan_files)
     

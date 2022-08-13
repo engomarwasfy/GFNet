@@ -13,18 +13,14 @@ ALIGN=False
 BatchNorm = nn.BatchNorm2d
 
 def get_range_model(**kwargs):
-    model = RangeUnet(**kwargs)
-    return model
+    return RangeUnet(**kwargs)
 
 
 def get_polar_model(**kwargs):
-    model = PolarUnet(**kwargs)
-    return model
+    return PolarUnet(**kwargs)
 
 def resample_grid(predictions, pxpy):
-    resampled = F.grid_sample(predictions, pxpy)
-
-    return resampled
+    return F.grid_sample(predictions, pxpy)
 
 
 class KPClassifier(nn.Module):
