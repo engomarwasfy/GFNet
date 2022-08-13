@@ -121,8 +121,7 @@ def global_average(x, batch_lengths):
     # Loop over the clouds of the batch
     averaged_features = []
     i0 = 0
-    for b_i, length in enumerate(batch_lengths):
-
+    for length in batch_lengths:
         # Average features for each batch cloud
         averaged_features.append(torch.mean(x[i0 : i0 + length], dim=0))
 
@@ -448,7 +447,7 @@ def block_decider(block_name, radius, in_dim, out_dim, layer_ind, config):
             block_name, in_dim, out_dim, radius, layer_ind, config
         )
 
-    elif block_name == "max_pool" or block_name == "max_pool_wide":
+    elif block_name in ["max_pool", "max_pool_wide"]:
         return MaxPoolBlock(layer_ind)
 
     elif block_name == "global_average":
@@ -459,7 +458,7 @@ def block_decider(block_name, radius, in_dim, out_dim, layer_ind, config):
 
     else:
         raise ValueError(
-            "Unknown block name in the architecture definition : " + block_name
+            f"Unknown block name in the architecture definition : {block_name}"
         )
 
 
@@ -488,15 +487,13 @@ class BatchNormBlock(nn.Module):
         nn.init.zeros_(self.bias)
 
     def forward(self, x):
-        if self.use_bn:
-
-            x = x.unsqueeze(2)
-            x = x.transpose(0, 2)
-            x = self.batch_norm(x)
-            x = x.transpose(0, 2)
-            return x.squeeze()
-        else:
+        if not self.use_bn:
             return x + self.bias
+        x = x.unsqueeze(2)
+        x = x.transpose(0, 2)
+        x = self.batch_norm(x)
+        x = x.transpose(0, 2)
+        return x.squeeze()
 
     def __repr__(self):
         return "BatchNormBlock(in_feat: {:d}, momentum: {:.3f}, only_bias: {:s})".format(
@@ -586,13 +583,12 @@ class SimpleBlock(nn.Module):
 
         if "strided" in self.block_name:
             q_pts = batch.points[self.layer_ind + 1]
-            s_pts = batch.points[self.layer_ind]
             neighb_inds = batch.pools[self.layer_ind]
         else:
             q_pts = batch.points[self.layer_ind]
-            s_pts = batch.points[self.layer_ind]
             neighb_inds = batch.neighbors[self.layer_ind]
 
+        s_pts = batch.points[self.layer_ind]
         x = self.KPConv(q_pts, s_pts, neighb_inds, x)
         return self.leaky_relu(self.batch_norm(x))
 
@@ -667,13 +663,12 @@ class ResnetBottleneckBlock(nn.Module):
 
         if "strided" in self.block_name:
             q_pts = batch.points[self.layer_ind + 1]
-            s_pts = batch.points[self.layer_ind]
             neighb_inds = batch.pools[self.layer_ind]
         else:
             q_pts = batch.points[self.layer_ind]
-            s_pts = batch.points[self.layer_ind]
             neighb_inds = batch.neighbors[self.layer_ind]
 
+        s_pts = batch.points[self.layer_ind]
         # First downscaling mlp
         x = self.unary1(features)
 

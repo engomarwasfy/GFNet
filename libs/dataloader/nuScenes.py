@@ -32,15 +32,15 @@ class Nuscenes(Dataset):
                  return_ref=True,
                  knn=True):
         assert version in ['v1.0-trainval', 'v1.0-test', 'v1.0-mini']
-        if version == 'v1.0-trainval':
-            train_scenes = splits.train
-            val_scenes = splits.val
+        if version == 'v1.0-mini':
+            train_scenes = splits.mini_train
+            val_scenes = splits.mini_val
         elif version == 'v1.0-test':
             train_scenes = splits.test
             val_scenes = []
-        elif version == 'v1.0-mini':
-            train_scenes = splits.mini_train
-            val_scenes = splits.mini_val
+        elif version == 'v1.0-trainval':
+            train_scenes = splits.train
+            val_scenes = splits.val
         else:
             raise NotImplementedError
         self.split = split
@@ -69,7 +69,7 @@ class Nuscenes(Dataset):
         self.samples = [v.split('**')[0] for v in self.samples_annots]
         self.annotations = [v.split('**')[1] for v in self.samples_annots]
 
-        mp_logger('loading {} set with {} samples'.format(split, len(self.samples)))
+        mp_logger(f'loading {split} set with {len(self.samples)} samples')
 
     def get_xentropy_class_string(self, idx):
         return self.labels[idx]
@@ -77,7 +77,7 @@ class Nuscenes(Dataset):
     def change_split(self, s):
         assert s in ['train', 'val']
         self.split = s
-        mp_logger('change split to {}'.format(s))
+        mp_logger(f'change split to {s}')
 
     def write_txt(self):
         # for sample
@@ -89,12 +89,10 @@ class Nuscenes(Dataset):
         if s:
             self.change_split(s)
 
-        if self.split == 'train':
+        if self.split in ['train', 'test']:
             self.token_list = self.train_token_list
         elif self.split == 'val':
             self.token_list = self.val_token_list
-        elif self.split == 'test':
-            self.token_list = self.train_token_list
 
     def range_dataset(self, scan_points, scan_file, label, label_file):
         self.sensor_img_means = torch.tensor(self.range['sensor_img_means'],

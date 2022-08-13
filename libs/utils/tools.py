@@ -38,9 +38,8 @@ def mp_logger(meg, name='main-logger'):
 def load_arch_cfg(arch_cfg):
     # open arch config file
     try:
-        print("Opening arch config file %s" % arch_cfg)
-        ARCH = yaml.safe_load(open(arch_cfg, 'r'))
-        return ARCH
+        print(f"Opening arch config file {arch_cfg}")
+        return yaml.safe_load(open(arch_cfg, 'r'))
     except Exception as e:
         print(e)
         print("Error opening arch yaml file.")
@@ -49,9 +48,8 @@ def load_arch_cfg(arch_cfg):
 def load_data_cfg(data_cfg):
     # open data config file
     try:
-        print("Opening data config file %s" % data_cfg)
-        DATA = yaml.safe_load(open(data_cfg, 'r'))
-        return DATA
+        print(f"Opening data config file {data_cfg}")
+        return yaml.safe_load(open(data_cfg, 'r'))
     except Exception as e:
         print(e)
         print("Error opening data yaml file.")
@@ -171,7 +169,7 @@ def load_part_params(model, trained_params):
     params = dict(model.state_dict())
 
     for k, v in params.items():
-        new_k = 'backbone.' + k
+        new_k = f'backbone.{k}'
         if new_k in trained_params:
             params[k].data.copy_(trained_params[new_k].data)
     model.load_state_dict(params)
@@ -181,7 +179,7 @@ def load_pretrained(pretrained, model):
     epoch = best_iou = 0
     # does model folder exist?
     if os.path.isfile(pretrained):
-        mp_logger("pretrained model exists! Using model from %s" % (pretrained))
+        mp_logger(f"pretrained model exists! Using model from {pretrained}")
         checkpoint = torch.load(pretrained, map_location=lambda storage, loc: storage.cuda())
         if 'state_dict' in checkpoint:
             model.load_state_dict(checkpoint['state_dict'])
@@ -197,13 +195,13 @@ def resume_training(resume, model, optimizer):
     epoch = best_iou = 0
     # does model folder exist?
     if os.path.isfile(resume):
-        mp_logger("model exists! Resuming model from %s" % (resume))
+        mp_logger(f"model exists! Resuming model from {resume}")
         checkpoint = torch.load(resume, map_location=lambda storage, loc: storage.cuda())
         model.load_state_dict(checkpoint['model'])
         optimizer.load_state_dict(checkpoint['optimizer'])
         epoch = checkpoint['epoch'] + 1
         best_iou = checkpoint['best_iou']
-        mp_logger("start from epoch: {}, with current best iou: {}".format(epoch, best_iou))
+        mp_logger(f"start from epoch: {epoch}, with current best iou: {best_iou}")
     else:
         mp_logger("model doesnt exist! Start with random weights...")
     return model, optimizer, epoch, best_iou
@@ -216,24 +214,23 @@ def recording_cfg(arch_cfg, data_cfg, log_path):
     ignores = ['.git', '.gitignore', 'debug', 'dataset', 'logs', 'pretrained', '__pycache__']
     valid_ext = ['.py', '.sh', '.ply', '.yaml']
     try:
-        print("Copying files to %s for further reference." % log_path)
+        print(f"Copying files to {log_path} for further reference.")
         shutil.copyfile(arch_cfg, os.path.join(log_path, "arch_cfg.yaml"))
         shutil.copyfile(data_cfg, os.path.join(log_path, "data_cfg.yaml"))
 
         log_path = os.path.join(log_path, "codes")
         for v in sorted(os.listdir(pwd)):
             if v not in ignores:
-                if not os.path.isdir(os.path.join(pwd, v)):
-                    if any(v.endswith(ext) for ext in valid_ext) and 'debug' not in v:
-                        os.makedirs(log_path, exist_ok=True)
-                        shutil.copyfile(os.path.join(pwd, v), os.path.join(log_path, v))
-                else:
+                if os.path.isdir(os.path.join(pwd, v)):
                     for dp, dn, fn in os.walk(os.path.join(pwd, v)):
                         for f in fn:
                             if any(f.endswith(ext) for ext in valid_ext):
                                 filename = os.path.join(dp, f)
                                 os.makedirs(os.path.dirname(filename.replace(pwd, log_path)), exist_ok=True)
                                 shutil.copyfile(filename, filename.replace(pwd, log_path))
+                elif any(v.endswith(ext) for ext in valid_ext) and 'debug' not in v:
+                    os.makedirs(log_path, exist_ok=True)
+                    shutil.copyfile(os.path.join(pwd, v), os.path.join(log_path, v))
     except Exception as e:
         print(e)
         print("Error copying files, check permissions. Exiting...")
@@ -307,11 +304,11 @@ def vis_range_view(data_loader, root='temp/' + 'v2_1hres_0flip_1trans_0rot'):
             break
 
 def whether_aug(train, condition=None):
-    if condition is not None:
-        aug = train and condition and (random.random() > 0.5)
-    else:
-        aug = train and (random.random() > 0.5)
-    return aug
+    return (
+        train and condition and (random.random() > 0.5)
+        if condition is not None
+        else train and (random.random() > 0.5)
+    )
 
 @nb.jit('u1[:,:,:](u1[:,:,:],i8[:,:])',nopython=True,cache=True,parallel = False)
 def nb_process_label(processed_label,sorted_label_voxel_pair):
@@ -351,7 +348,7 @@ def get_weight_per_class(epsilon_w, n_class, contents, mapping, ignore):
       if ignore[x_cl]:
         # don't weigh
         loss_w[x_cl] = 0
-    mp_logger("Loss weights from content: {}".format(loss_w.data))
+    mp_logger(f"Loss weights from content: {loss_w.data}")
     return loss_w
 
 def display_iou(ious, names, class_string, avg='val_avg_iou'):

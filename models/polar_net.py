@@ -31,25 +31,25 @@ class polar_net(nn.Module):
         super(polar_net, self).__init__()
         assert pt_pooling in ['max']
         assert pt_selection in ['random','farthest']
-        
+
         self.PPmodel = nn.Sequential(
             nn.BatchNorm1d(fea_dim),
-            
+
             nn.Linear(fea_dim, 64),
             nn.BatchNorm1d(64),
             nn.ReLU(inplace=True),
-            
+
             nn.Linear(64, 128),
             nn.BatchNorm1d(128),
             nn.ReLU(inplace=True),
-            
+
             nn.Linear(128, 256),
             nn.BatchNorm1d(256),
             nn.ReLU(inplace=True),
-            
+
             nn.Linear(256, out_pt_fea_dim)
         )
-        
+
         self.pt_model = pt_model
         self.unet_model = BEV_Unet(n_class, n_height, layers=layers, pretrained=True)
         self.pt_pooling = pt_pooling
@@ -57,20 +57,19 @@ class polar_net(nn.Module):
         self.pt_selection = pt_selection
         self.fea_compre = fea_compre
         self.grid_size = grid_size
-        
+
         # NN stuff
-        if kernal_size != 1:
-            if self.pt_pooling == 'max':
-                self.local_pool_op = torch.nn.MaxPool2d(kernal_size, stride=1, padding=(kernal_size-1)//2, dilation=1)
-            else: 
-                raise NotImplementedError
-        else: 
+        if kernal_size == 1: 
             self.local_pool_op = None
-        
+
+        elif self.pt_pooling == 'max':
+            self.local_pool_op = torch.nn.MaxPool2d(kernal_size, stride=1, padding=(kernal_size-1)//2, dilation=1)
+        else: 
+            raise NotImplementedError
         # parametric pooling        
         if self.pt_pooling == 'max':
             self.pool_dim = out_pt_fea_dim
-        
+
         # point feature compression
         assert self.fea_compre
         self.fea_compression = nn.Sequential(
@@ -88,12 +87,12 @@ class polar_net(nn.Module):
         for i_batch in range(len(pt_fea)):
             pt_fea_valid.append(pt_fea[i_batch, :num_pt_each[i_batch], :])
             xy_ind_valid.append(xy_ind[i_batch, :num_pt_each[i_batch], :])
-        
-        # concate everything
-        cat_pt_ind = []
-        for i_batch in range(len(xy_ind)):
-            cat_pt_ind.append(F.pad(xy_ind_valid[i_batch],(1,0),'constant',value = i_batch))
 
+        # concate everything
+        cat_pt_ind = [
+            F.pad(xy_ind_valid[i_batch], (1, 0), 'constant', value=i_batch)
+            for i_batch in range(len(xy_ind))
+        ]
 
         cat_pt_fea = torch.cat(pt_fea_valid,dim = 0)
         cat_pt_ind = torch.cat(cat_pt_ind,dim = 0)
@@ -103,11 +102,11 @@ class polar_net(nn.Module):
         shuffled_ind = torch.randperm(pt_num,device = cur_dev)
         cat_pt_fea = cat_pt_fea[shuffled_ind,:]
         cat_pt_ind = cat_pt_ind[shuffled_ind,:]
-        
+
         # unique xy grid index
         unq, unq_inv, unq_cnt = torch.unique(cat_pt_ind,return_inverse=True, return_counts=True, dim=0)
         unq = unq.type(torch.int64)
-        
+
         # subsample pts
         if self.pt_selection == 'random':
             grp_ind = grp_range_torch(unq_cnt,cur_dev)[torch.argsort(torch.argsort(unq_inv))]
@@ -116,11 +115,11 @@ class polar_net(nn.Module):
             unq_ind = np.split(np.argsort(unq_inv.detach().cpu().numpy()), np.cumsum(unq_cnt.detach().cpu().numpy()[:-1]))
             remain_ind = np.zeros((pt_num,),dtype = np.bool)
             np_cat_fea = cat_pt_fea.detach().cpu().numpy()[:,:3]
-            pool_in = []
-            for i_inds in unq_ind:
-                if len(i_inds) > self.max_pt:
-                    pool_in.append((np_cat_fea[i_inds,:],self.max_pt))
-            if len(pool_in) > 0:
+            if pool_in := [
+                (np_cat_fea[i_inds, :], self.max_pt)
+                for i_inds in unq_ind
+                if len(i_inds) > self.max_pt
+            ]:
                 pool = multiprocessing.Pool(multiprocessing.cpu_count())
                 FPS_results = pool.starmap(parallel_FPS, pool_in)
                 pool.close()
@@ -132,12 +131,12 @@ class polar_net(nn.Module):
                 else:
                     remain_ind[i_inds[FPS_results[count]]] = True
                     count += 1
-            
+
         cat_pt_fea = cat_pt_fea[remain_ind,:]
         cat_pt_ind = cat_pt_ind[remain_ind,:]
         unq_inv = unq_inv[remain_ind]
         unq_cnt = torch.clamp(unq_cnt,max=self.max_pt)
-        
+
         return cat_pt_fea, unq, unq_inv, batch_size, cur_dev
         
     def reformat_data(self, processed_pooled_data, unq, batch_size, cur_dev, data_type):
@@ -161,11 +160,8 @@ class polar_net(nn.Module):
         processed_pooled_data = self.fea_compression(pooled_data)
 
         out_data = self.reformat_data(processed_pooled_data, unq, batch_size, cur_dev)
-        
-        # run through network
-        net_return_data = self.unet_model(out_data)
-        
-        return net_return_data
+
+        return self.unet_model(out_data)
     
 def grp_range_torch(a,dev):
     idx = torch.cumsum(a,0)
@@ -186,13 +182,13 @@ def nb_greedy_FPS(xyz,K):
     for j in range(sample_num):
         sum_vec[j,0] = np.sum(xyz_sq[j,:])
     pairwise_distance = sum_vec + np.transpose(sum_vec) - 2*np.dot(xyz, np.transpose(xyz))
-    
+
     candidates_ind = np.zeros((sample_num,),dtype = np.bool_)
     candidates_ind[start_element] = True
     remain_ind = np.ones((sample_num,),dtype = np.bool_)
     remain_ind[start_element] = False
     all_ind = np.arange(sample_num)
-    
+
     for i in range(1,K):
         if i == 1:
             min_remain_pt_dis = pairwise_distance[:,start_element]
@@ -207,5 +203,5 @@ def nb_greedy_FPS(xyz,K):
         next_ind = all_ind[remain_ind][next_ind_in_remain]
         candidates_ind[next_ind] = True
         remain_ind[next_ind] = False
-        
+
     return candidates_ind
